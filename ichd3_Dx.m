@@ -1,4 +1,3 @@
-% Determines ICHD3 diagnoses based on patient questionnaire
 function [ICHD3] = ichd3_Dx(tbl)
         
 %% Migraine features
@@ -49,6 +48,8 @@ function [ICHD3] = ichd3_Dx(tbl)
         ICHD3.phonophobia(tbl.p_assoc_sx_oth_sx___sound==1|tbl.p_trigger___noises==1) = 1;
         
         ICHD3.nausea_vomiting(tbl.p_assoc_sx_gi___naus==1|tbl.p_assoc_sx_gi___vomiting==1) = 1;
+        
+        ICHD3.nas_photophono = sum([tbl.p_assoc_sx_gi___naus ICHD3.photophobia ICHD3.phonophobia],2);
         
         ICHD3.mig_sev = zeros(height(tbl),1);
         ICHD3.mig_sev(tbl.p_sev_overall=='mod'|tbl.p_sev_overall=='sev'|tbl.p_sev_usual>3) = 1;
@@ -115,10 +116,12 @@ function [ICHD3] = ichd3_Dx(tbl)
         ICHD3.tth = zeros(height(tbl),1);
         ICHD3.tth(ICHD3.tth_score==4) = 1;
         
+        % Chronic TTH
         ICHD3.chronic_tth = zeros(height(tbl),1);
-        ICHD3.chronic_tth(ICHD3.tth==1 & (tbl.p_con_pattern_duration=='3yrs'|tbl.p_con_pattern_duration=='1to2y'|tbl.p_con_pattern_duration=='6to12mo'|...
-            tbl.p_con_pattern_duration=='3to6mo'|tbl.p_con_pattern_duration=='2to3y'|tbl.p_epi_fre_dur=='3mo') & (tbl.p_fre_bad=='2to3wk'|tbl.p_fre_bad=='3wk'|tbl.p_fre_bad=='daily'|...
-            tbl.p_fre_bad=='always')) = 1;
+        ICHD3.chronic_tth(ICHD3.tth_char>=2 & (ICHD3.mig_dur==1 | tbl.p_current_ha_pattern=='cons_same' | tbl.p_current_ha_pattern=='cons_flare')...
+            & ICHD3.nas_photophono<2 & (tbl.p_con_pattern_duration=='3yrs'|tbl.p_con_pattern_duration=='1to2y'|tbl.p_con_pattern_duration=='6to12mo'|...
+            tbl.p_con_pattern_duration=='3to6mo'|tbl.p_con_pattern_duration=='2to3y'|tbl.p_epi_fre_dur=='3mo')) = 1;
+        
         
         %% TAC
         ICHD3.unilateral_sideLocked = zeros(height(tbl),1);        
@@ -155,10 +158,17 @@ function [ICHD3] = ichd3_Dx(tbl)
         
         %% Occipital neuralgia
         ICHD3.on = zeros(height(tbl),1);
-        ICHD3.on(tbl.p_location_area___back==1 & (tbl.p_sev_dur=='secs' | tbl.p_sev_dur=='mins') & (tbl.p_sev_overall=='sev' |...
-            tbl.p_sev_usual>=7) & (tbl.p_ha_quality___stab==1 | tbl.p_ha_quality___sharp==1)) = 1;
-        ICHD3.on(tbl.p_location_area___sides==1 | tbl.p_location_area___front==1 | tbl.p_location_area___around==1 |...
-            tbl.p_location_area___behind==1 | tbl.p_location_area___allover==1) = 0;
+        loc = zeros(height(tbl),1);
+        loc(tbl.p_location_area___back==1 & tbl.p_location_area___sides==0 & tbl.p_location_area___front==0 & tbl.p_location_area___around==0 &...
+            tbl.p_location_area___behind==0 & tbl.p_location_area___allover==0) = 1;
+        dur = zeros(height(tbl),1);
+        dur(tbl.p_sev_dur=='secs' | tbl.p_sev_dur=='mins') = 1;
+        sev = zeros(height(tbl),1);
+        sev(tbl.p_sev_overall=='sev'|tbl.p_sev_usual>=7) = 1;
+        qual = zeros(height(tbl),1);
+        qual(tbl.p_ha_quality___stab==1 | tbl.p_ha_quality___sharp==1) = 1;
+        on_char = sum([dur sev qual],2);
+        ICHD3.on(on_char>=2 & loc==1) = 1;
 
         %% Criteria for PTH
         ICHD3.pth = zeros(height(tbl),1);
@@ -182,30 +192,34 @@ function [ICHD3] = ichd3_Dx(tbl)
         %% phenotype
         
         ICHD3.pheno = zeros(height(tbl),1);
-        ICHD3.pheno(ICHD3.tth==1) = 3;
-        ICHD3.pheno(ICHD3.psh==1) = 5;
-        ICHD3.pheno(ICHD3.on==1) = 5;
+        ICHD3.pheno(ICHD3.tth==1) = 4;
+        ICHD3.pheno(ICHD3.chronic_tth==1) = 5;
+        ICHD3.pheno(ICHD3.psh==1) = 7;
+        ICHD3.pheno(ICHD3.on==1) = 7;
         ICHD3.pheno(ICHD3.probable_migraine==1) = 2;
         ICHD3.pheno(ICHD3.migraine==1) = 1;
-        ICHD3.pheno(ICHD3.cluster==1) = 4;
-        ICHD3.pheno(ICHD3.hc==1) = 4;
+        ICHD3.pheno(ICHD3.chronic_migraine==1) = 3;
+        ICHD3.pheno(ICHD3.cluster==1) = 6;
+        ICHD3.pheno(ICHD3.hc==1) = 6;
         
-        ICHD3.pheno = categorical(ICHD3.pheno,[0 1 2 3 4 65,{'undefined','migraine','prob_migraine','tth','tac','other_primary'});
+        ICHD3.pheno = categorical(ICHD3.pheno,[0 1 2 3 4 5 6 7],{'undefined','migraine','prob_migraine','chronic_migraine','tth','chronic_tth','tac','other_primary'});
         %% final diagnosis
         
         ICHD3.dx = zeros(height(tbl),1);
-        ICHD3.dx(ICHD3.tth==1) = 3;
-        ICHD3.dx(ICHD3.on==1) = 5;
-        ICHD3.dx(ICHD3.psh==1) = 5;
+        ICHD3.dx(ICHD3.tth==1) = 4;
+        ICHD3.dx(ICHD3.chronic_tth==1) = 5;
+        ICHD3.dx(ICHD3.on==1) = 7;
+        ICHD3.dx(ICHD3.psh==1) = 7;
         ICHD3.dx(ICHD3.probable_migraine==1) = 2;
         ICHD3.dx(ICHD3.migraine==1) = 1;
-        ICHD3.dx(ICHD3.cluster==1) = 4;
-        ICHD3.dx(ICHD3.hc==1) = 4;
-        ICHD3.dx(ICHD3.new_onset==1) = 6;
-        ICHD3.dx(ICHD3.ndph==1) = 7;
-        ICHD3.dx(ICHD3.pth==1) = 8;
+        ICHD3.dx(ICHD3.chronic_migraine==1) = 3;
+        ICHD3.dx(ICHD3.cluster==1) = 6;
+        ICHD3.dx(ICHD3.hc==1) = 6;
+        ICHD3.dx(ICHD3.new_onset==1) = 8;
+        ICHD3.dx(ICHD3.ndph==1) = 9;
+        ICHD3.dx(ICHD3.pth==1) = 10;
         
         
-        ICHD3.dx = categorical(ICHD3.dx,[0 1 2 3 4 5 6 7 8],{'undefined','migraine','prob_migraine','tth','tac','other_primary','new_onset','ndph','pth'});
+        ICHD3.dx = categorical(ICHD3.dx,[0 1 2 3 4 5 6 7 8 9 10],{'undefined','migraine','prob_migraine','chronic_migraine','tth','chronic_tth','tac','other_primary','new_onset','ndph','pth'});
         
 end
