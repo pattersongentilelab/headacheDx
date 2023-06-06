@@ -90,14 +90,21 @@ function [ICHD3] = ichd3_Dx(tbl)
         ICHD3.migraine_aura((ICHD3.migraine==1|ICHD3.probable_migraine==1)& ICHD3.aura==1) = 1;
         
         % determine if chronic
+        ICHD3.chronic_bad = zeros(height(tbl),1);
+        ICHD3.chronic_bad (tbl.p_fre_bad=='2to3wk'|tbl.p_fre_bad=='3wk'|tbl.p_fre_bad=='daily'|tbl.p_fre_bad=='always') = 1;
+        
+        ICHD3.chronic_dur = zeros(height(tbl),1);
+        ICHD3.chronic_dur (tbl.p_con_pattern_duration=='3yrs'|tbl.p_con_pattern_duration=='1to2y'|tbl.p_con_pattern_duration=='6to12mo'|...
+            tbl.p_con_pattern_duration=='3to6mo'|tbl.p_con_pattern_duration=='2to3y') = 1;
+        ICHD3.chronic_dur (tbl.p_epi_fre_dur=='3mo') = 1;
+        
         ICHD3.chronic_migraine = zeros(height(tbl),1);
-        ICHD3.chronic_migraine((ICHD3.migraine==1|ICHD3.probable_migraine==1) & (tbl.p_con_pattern_duration=='3yrs'|tbl.p_con_pattern_duration=='1to2y'|tbl.p_con_pattern_duration=='6to12mo'|...
-            tbl.p_con_pattern_duration=='3to6mo'|tbl.p_con_pattern_duration=='2to3y'|tbl.p_epi_fre_dur=='3mo') & (tbl.p_fre_bad=='2to3wk'|tbl.p_fre_bad=='3wk'|tbl.p_fre_bad=='daily'|...
-            tbl.p_fre_bad=='always')) = 1;
+        ICHD3.chronic_migraine((ICHD3.migraine==1|ICHD3.probable_migraine==1) & ICHD3.chronic_dur==1 & ICHD3.chronic_bad==1) = 1;
         
  
         %% Tension type headache criteria
         
+        ICHD3.tth_dur = zeros(height(tbl),1);
         ICHD3.tth_dur(tbl.p_sev_dur=='3days'|tbl.p_sev_dur=='1to3d'|tbl.p_sev_dur=='hrs'|tbl.p_sev_dur=='mins') = 1;
         
         ICHD3.tth_char = zeros(height(tbl),1);
@@ -119,8 +126,7 @@ function [ICHD3] = ichd3_Dx(tbl)
         % Chronic TTH
         ICHD3.chronic_tth = zeros(height(tbl),1);
         ICHD3.chronic_tth(ICHD3.tth_char>=2 & (ICHD3.mig_dur==1 | tbl.p_current_ha_pattern=='cons_same' | tbl.p_current_ha_pattern=='cons_flare')...
-            & ICHD3.nas_photophono<2 & (tbl.p_con_pattern_duration=='3yrs'|tbl.p_con_pattern_duration=='1to2y'|tbl.p_con_pattern_duration=='6to12mo'|...
-            tbl.p_con_pattern_duration=='3to6mo'|tbl.p_con_pattern_duration=='2to3y'|tbl.p_epi_fre_dur=='3mo')) = 1;
+            & ICHD3.nas_photophono<2 & ICHD3.chronic_dur==1) = 1;
         
         
         %% TAC
@@ -137,8 +143,7 @@ function [ICHD3] = ichd3_Dx(tbl)
         
         ICHD3.hc_dur = zeros(height(tbl),1);
         
-        ICHD3.hc_dur(tbl.p_con_pattern_duration=='3to6mo' | tbl.p_con_pattern_duration=='6to12mo' | tbl.p_con_pattern_duration=='1to2y' | tbl.p_con_pattern_duration=='2to3y' |...
-            tbl.p_con_pattern_duration=='3yrs' | tbl.p_epi_fre_dur=='3mo') = 1;
+        ICHD3.hc_dur(ICHD3.chronic_dur==1) = 1;
         
         % This HC code agrees with CLS 3/6/23
         ICHD3.hc = zeros(height(tbl),1);
